@@ -8,7 +8,6 @@ services:
     image: nod-server:${NOD_IMAGE_TAG:-local}
     restart: unless-stopped
     init: true
-    env_file: ${NOD_ENV_FILE:-.env}
     environment:
       NODE_ENV: production
       NOD_ENVIRONMENT: production
@@ -22,8 +21,14 @@ services:
       DOCKER_HOST: tcp://runtime:2375
       WORKSPACE_CONTAINER: nod-workspace-${COMPOSE_PROJECT_NAME:-nod-server}
       BROWSER_CONTAINER: nod-browser-${COMPOSE_PROJECT_NAME:-nod-server}
-    ports:
-      - '${NOD_BIND_ADDRESS:-127.0.0.1}:${PORT:-4310}:${PORT:-4310}'
+      # Fournisseur IA (API compatible OpenAI) — a renseigner dans l'env Dokploy.
+      # Vides au 1er depart : le serveur demarre et la connexion se fait via l'UI (Models).
+      LLM_PROVIDER: ${LLM_PROVIDER:-}
+      LLM_MODEL: ${LLM_MODEL:-}
+      OPENAI_COMPATIBLE_BASE_URL: ${OPENAI_COMPATIBLE_BASE_URL:-}
+      OPENAI_COMPATIBLE_API_KEY: ${OPENAI_COMPATIBLE_API_KEY:-}
+    expose:
+      - "4310"
     volumes:
       - server-data:/var/lib/nod
       - workspace-data:/var/lib/nod/workspaces
@@ -34,7 +39,7 @@ services:
     security_opt: [no-new-privileges:true]
     pids_limit: 512
     mem_limit: ${NOD_SERVER_MEMORY:-2g}
-    networks: [backend, control, outbound]
+    networks: [backend, control, outbound, nod-n8n]
     depends_on:
       postgres:
         condition: service_healthy
@@ -203,6 +208,12 @@ services:
       retries: 6
 
 networks:
+  # Reseau par defaut : permet au reverse proxy Dokploy (Traefik) d'atteindre
+  # le port 4310 expose du service server (aucun port public).
+  default:
+  # Reseau partage avec n8n (compose n8n) pour l'integration Nod -> n8n.
+  nod-n8n:
+    external: true
   backend:
     internal: true
   control:
